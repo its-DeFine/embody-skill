@@ -8,6 +8,9 @@ description: Deterministic public client skill for allocating and controlling an
 
 # Embody Skill (Deterministic v1.2)
 
+## Reference Documents
+- Full stable-build TCP list: `TCP_CONTROLLER_STABLE_REFERENCE.md`
+
 ## Fixed Commercial Terms (Authoritative)
 - plan_id: `embody_beta_v1`
 - pricing_model: `fixed_zero`
@@ -175,6 +178,7 @@ description: Deterministic public client skill for allocating and controlling an
 - Use TTS only when voice output is explicitly required.
 - Never commit or echo credential-bearing commands with real keys.
 - If command compatibility is uncertain, send one command at a time and verify via output video/state.
+- If a command is not listed in this summary, check `TCP_CONTROLLER_STABLE_REFERENCE.md`.
 
 ## Explicitly Out of Scope (v1.2)
 - Dynamic pricing updates from runtime inputs
