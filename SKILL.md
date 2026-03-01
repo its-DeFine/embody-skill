@@ -12,6 +12,7 @@ This skill has one goal: let an agent get an avatar session fast, control it rel
 - Duration: up to 24 hours (`1 day` or less).
 - Orchestrator selection is automatic (nearest available, first-come-first-served).
 - You do not provide an orchestrator id.
+- Control is API-routed: you do not send TCP directly to orchestrator IPs.
 
 ## 2) Hard Rules
 - Use only the session API. Do not call orchestrators directly.
@@ -24,15 +25,25 @@ This skill has one goal: let an agent get an avatar session fast, control it rel
 ### Step A: Start
 `POST /api/sessions/start`
 
+Optional request body:
+- `{ "requested_duration_seconds": <seconds> }`
+- Range: `60` to `86400` (server also enforces max lease policy).
+
 Expected response fields:
 - `session_id`
 - `token`
 - `expires_at`
 - `webrtc_url`
 - `control_url`
+- `edge` (includes assigned edge endpoint data such as `matchmaker_host`, `matchmaker_port`, optional `turn_external_ip`)
 
 ### Step B: Control
 `POST /api/sessions/tcp` with `Authorization: Bearer <token>`
+
+Important:
+- Send TCP commands to `control_url` (or `${BASE}/api/sessions/tcp`) only.
+- Do not send TCP commands directly to any orchestrator/edge IP.
+- Routing to your assigned edge/orchestrator is handled server-side.
 
 ### Step C: Check state
 `GET /api/sessions/me`
@@ -90,16 +101,23 @@ BASE="${API_BASE}"
 
 START="$(curl -s -X POST "${BASE}/api/sessions/start" \
   -H "Content-Type: application/json" \
-  -d '{}')"
+  -d '{"requested_duration_seconds":7200}')"
 
 TOKEN="$(echo "${START}" | jq -r '.token')"
+WEBRTC_URL="$(echo "${START}" | jq -r '.webrtc_url')"
+CONTROL_URL="$(echo "${START}" | jq -r '.control_url')"
+ASSIGNED_HOST="$(echo "${START}" | jq -r '.edge.matchmaker_host // empty')"
 
-curl -s -X POST "${BASE}/api/sessions/tcp" \
+# Optional visibility of assigned endpoint identity:
+echo "Assigned WebRTC URL: ${WEBRTC_URL}"
+echo "Assigned endpoint host: ${ASSIGNED_HOST}"
+
+curl -s -X POST "${CONTROL_URL}" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"command":"EMOTE_Wave"}'
 
-curl -s -X POST "${BASE}/api/sessions/tcp" \
+curl -s -X POST "${CONTROL_URL}" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"command":"CAMSHOT.Medium"}'
