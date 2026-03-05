@@ -7,15 +7,23 @@ description: Simple client skill for getting a time-limited Embody avatar sessio
 
 This skill has one goal: let an agent get an avatar session fast, control it reliably, and release it cleanly.
 
+Base URL:
+- `https://api.embody.zone`
+
+Operator-only domain:
+- Do not use this from client/consumer flows. It is reserved for private operator actions and is not part of the session UX.
+
 ## 1) What You Get
 - A session bound to your calling IP.
 - Duration: up to 24 hours (`1 day` or less).
 - Orchestrator selection is automatic (nearest available, first-come-first-served).
 - You do not provide an orchestrator id.
-- Control is API-routed: you do not send TCP directly to orchestrator IPs.
+- Control is API-routed: you do not send TCP directly to orchestrator or edge IPs.
 
 ## 2) Hard Rules
 - Use only the session API. Do not call orchestrators directly.
+- Start from `https://api.embody.zone` only.
+- Treat `webrtc_url` as the scene entrypoint and `control_url` as the command entrypoint.
 - Never print or store secrets (tokens, auth headers, provider keys).
 - Use stable-build commands only.
 - Keep command pacing sane (one command at a time for validation-critical actions).
@@ -23,7 +31,7 @@ This skill has one goal: let an agent get an avatar session fast, control it rel
 ## 3) Session Flow (Deterministic)
 
 ### Step A: Start
-`POST /api/sessions/start`
+`POST https://api.embody.zone/api/sessions/start`
 
 Optional request body:
 - `{ "requested_duration_seconds": <seconds> }`
@@ -35,24 +43,24 @@ Expected response fields:
 - `expires_at`
 - `webrtc_url`
 - `control_url`
-- `edge` (includes assigned edge endpoint data such as `matchmaker_host`, `matchmaker_port`, optional `turn_external_ip`)
+- `edge` (diagnostic assignment data only; not for direct client TCP use)
 
 ### Step B: Control
-`POST /api/sessions/tcp` with `Authorization: Bearer <token>`
+`POST https://api.embody.zone/api/sessions/tcp` with `Authorization: Bearer <token>`
 
 Important:
-- Send TCP commands to `control_url` (or `${BASE}/api/sessions/tcp`) only.
-- Do not send TCP commands directly to any orchestrator/edge IP.
+- Send TCP commands to `control_url` (or `https://api.embody.zone/api/sessions/tcp`) only.
+- Do not send TCP commands directly to any orchestrator or edge IP.
 - Routing to your assigned edge/orchestrator is handled server-side.
 
 ### Step C: Check state
-`GET /api/sessions/me`
+`GET https://api.embody.zone/api/sessions/me`
 
 ### Step D: Keep alive (optional for long runs)
-`POST /api/sessions/heartbeat`
+`POST https://api.embody.zone/api/sessions/heartbeat`
 
 ### Step E: End cleanly
-`POST /api/sessions/end`
+`POST https://api.embody.zone/api/sessions/end`
 
 ## 4) Quickstart Commands (Minimal, High Signal)
 Use these first to verify control end-to-end without TTS risk.
@@ -97,7 +105,7 @@ Use this only after the quickstart commands pass.
 
 ## 7) Curl Template
 ```bash
-BASE="${API_BASE}"
+BASE="https://api.embody.zone"
 
 START="$(curl -s -X POST "${BASE}/api/sessions/start" \
   -H "Content-Type: application/json" \
@@ -108,7 +116,7 @@ WEBRTC_URL="$(echo "${START}" | jq -r '.webrtc_url')"
 CONTROL_URL="$(echo "${START}" | jq -r '.control_url')"
 ASSIGNED_HOST="$(echo "${START}" | jq -r '.edge.matchmaker_host // empty')"
 
-# Optional visibility of assigned endpoint identity:
+# Optional visibility of assigned endpoint identity for debugging only:
 echo "Assigned WebRTC URL: ${WEBRTC_URL}"
 echo "Assigned endpoint host: ${ASSIGNED_HOST}"
 
