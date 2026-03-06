@@ -16,16 +16,18 @@ Operator-only domain:
 ## 1) What You Get
 - A session bound to your calling IP.
 - Duration: up to 24 hours (`1 day` or less).
-- Orchestrator selection is automatic (nearest available, first-come-first-served).
+- Orchestrator selection is automatic.
+- Current rollout is canary-only: the public allocator is intentionally constrained to the single working public path.
 - You do not provide an orchestrator id.
 - Control is API-routed: you do not send TCP directly to orchestrator or edge IPs.
-- Important: public session allocation is verified. Public TCP relay is only usable when your assigned edge exposes a relay path. If the API returns `503 Edge TCP relay not configured for this orchestrator`, the problem is infrastructure state, not your command syntax.
+- The consumer flow is tokenless: your session is bound to your calling IP and `session_id`.
+- Important: use the returned `webrtc_url` exactly as provided, even if it is `http://...` with query parameters.
 
 ## 2) Hard Rules
 - Use only the session API. Do not call orchestrators directly.
 - Start from `https://api.embody.zone` only.
 - Treat `webrtc_url` as the scene entrypoint and `control_url` as the command entrypoint.
-- Never print or store secrets (tokens, auth headers, provider keys).
+- Never print or store secrets (provider keys, internal operator credentials).
 - Do not print or reuse `edge.matchmaker_host`, `turn_external_ip`, or other edge diagnostics outside local debugging.
 - Use stable-build commands only.
 - Keep command pacing sane (one command at a time for validation-critical actions).
@@ -43,8 +45,8 @@ Optional request body:
 
 Expected response fields:
 - `session_id`
-- `token`
 - `expires_at`
+- `lease_seconds`
 - `webrtc_url`
 - `control_url`
 - `edge` (diagnostic assignment data only; not for direct client TCP use)
@@ -59,20 +61,20 @@ Check:
 - session exists and `ended_at` is `null`
 - `webrtc_url` is present
 - `control_url` is present
-- `edge.tcp_relay_url`
 
 Interpretation:
-- If `edge.tcp_relay_url` is `null`, do not keep retrying avatar commands. Session lifecycle is available, but public command relay is not wired for that assigned orchestrator yet.
+- The public canary path currently uses a direct runner-backed command path, so `edge.tcp_relay_url` may be `null` while control still works.
 - If `webrtc_url` times out, treat it as an edge health issue, not as a command-format issue.
 
-### Step C: Control (only when relay is available)
-`POST https://api.embody.zone/api/sessions/tcp` with `Authorization: Bearer <token>`
+### Step C: Control
+`POST https://api.embody.zone/api/sessions/tcp`
 
 Important:
 - Send TCP commands to `control_url` (or `https://api.embody.zone/api/sessions/tcp`) only.
 - Do not send TCP commands directly to any orchestrator or edge IP.
 - Routing to your assigned edge/orchestrator is handled server-side.
-- If the response is `503` with `Edge TCP relay not configured for this orchestrator`, stop and escalate. The relay is not ready on that assignment.
+- The public flow is IP-bound. Use `session_id` in the JSON body for explicitness; no bearer token is required.
+- The current canary path accepts safe commands without a consumer token.
 
 ### Step D: Keep alive (optional for long runs)
 `POST https://api.embody.zone/api/sessions/heartbeat`
@@ -81,7 +83,7 @@ Important:
 `POST https://api.embody.zone/api/sessions/end`
 
 ## 4) Quickstart Commands (Minimal, High Signal)
-Use these first only after Step B confirms relay availability. They are low-risk commands, not proof that the public relay is always configured.
+Use these first after Step B confirms you have an active session. They are low-risk commands for proving control on the current public canary.
 
 - `EMOTE_Wave`
 - `CAMSHOT.Medium`
@@ -129,7 +131,7 @@ START="$(curl -s -X POST "${BASE}/api/sessions/start" \
   -H "Content-Type: application/json" \
   -d '{}')"
 
-TOKEN="$(echo "${START}" | jq -r '.token')"
+SESSION_ID="$(echo "${START}" | jq -r '.session_id')"
 WEBRTC_URL="$(echo "${START}" | jq -r '.webrtc_url')"
 CONTROL_URL="$(echo "${START}" | jq -r '.control_url')"
 TCP_RELAY_URL="$(echo "${START}" | jq -r '.edge.tcp_relay_url // empty')"
@@ -137,35 +139,30 @@ TCP_RELAY_URL="$(echo "${START}" | jq -r '.edge.tcp_relay_url // empty')"
 # Local debug only. Do not paste assigned edge diagnostics into public logs.
 echo "Assigned WebRTC URL: ${WEBRTC_URL}"
 
-curl -s "${BASE}/api/sessions/me" \
-  -H "Authorization: Bearer ${TOKEN}"
+curl -s "${BASE}/api/sessions/me"
 
-if [ -n "${TCP_RELAY_URL}" ]; then
-  curl -s -X POST "${CONTROL_URL}" \
-    -H "Authorization: Bearer ${TOKEN}" \
-    -H "Content-Type: application/json" \
-    -d '{"command":"EMOTE_Wave"}'
+curl -s -X POST "${CONTROL_URL}" \
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"${SESSION_ID}\",\"command\":\"EMOTE_Wave\",\"timeout_seconds\":15}"
 
-  curl -s -X POST "${CONTROL_URL}" \
-    -H "Authorization: Bearer ${TOKEN}" \
-    -H "Content-Type: application/json" \
-    -d '{"command":"CAMSHOT.Medium"}'
-else
-  echo "Public TCP relay is not configured for this assignment yet."
-fi
+curl -s -X POST "${CONTROL_URL}" \
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"${SESSION_ID}\",\"command\":\"CAMSHOT.Medium\",\"timeout_seconds\":15}"
 
 curl -s -X POST "${BASE}/api/sessions/heartbeat" \
-  -H "Authorization: Bearer ${TOKEN}"
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"${SESSION_ID}\"}"
 
 curl -s -X POST "${BASE}/api/sessions/end" \
-  -H "Authorization: Bearer ${TOKEN}"
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"${SESSION_ID}\"}"
 ```
 
 ## 8) Failure Handling
 - If `start` returns an already-active session from your IP: reuse that session instead of trying to force a second one.
 - If `start` fails: retry once, then inspect API health/logs.
-- If `tcp` returns `503 Edge TCP relay not configured for this orchestrator`: session allocation worked, but the public relay is not available on that assignment.
+- If `tcp` returns `503` or `502`: treat it as infrastructure/runtime drift and escalate. It is not a consumer-token problem.
 - If `webrtc_url` does not load: treat it as an edge availability problem.
-- If commands are ignored and relay is present: send one known-safe command (`EMOTE_Wave`) and re-check `/api/sessions/me`.
-- If session expires: create a new session; do not reuse old token.
+- If commands are ignored: send one known-safe command (`EMOTE_Wave`) and re-check `/api/sessions/me`.
+- If session expires: create a new session; do not reuse an old `session_id`.
 - If output quality is uncertain: validate with non-TTS visible commands before any complex sequence.
