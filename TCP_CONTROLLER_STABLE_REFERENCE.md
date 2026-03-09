@@ -295,6 +295,25 @@ Setup format:
 Speak format:
 - `TTS_ElevenLabs_<text>_<stability>_<similarity>_<style>_<speed>_<language_code>_<mood>_<mood_intensity>`
 
+### Kokoro
+Verified speak format:
+- `TTS_Kokoro_Bella_Happy_0.7_<text>`
+
+Validation order:
+- Prove the command path with a visible camera command first, such as `CAMSHOT.Medium` or `CAMSHOT.Close`.
+- If the camera command does not land, do not spend time tuning Kokoro text or timing yet.
+- If commands stopped working after a game-only recreate, the script-runner may need recreation too because it shares the game network namespace and can drift after partial runtime resets.
+
+Timing guidance:
+- For normal use, send one Kokoro line at a time.
+- Fixed `5s` spacing is a stress-test pattern only, not the recommended default.
+- If you need multi-line delivery, use timing-aware queueing based on runtime signals rather than blind sleeps between commands.
+
+Runtime interpretation:
+- `Received audio buffer with N samples` means synthesis succeeded and audio reached the runtime.
+- `Kokoro synthesis cancelled after inference` means that line truly failed at runtime.
+- Lip-sync issues or audio buffer overflow can make a successful line feel skipped, so do not treat perceived silence as proof of synth failure without checking runtime evidence.
+
 ### NVIDIA Audio2Face
 - `NVIDIA_<DestinationURL>_<API_KEY_PLACEHOLDER>_<FunctionID>`
 - `TTS_NVIDIA_<wav_path>`
