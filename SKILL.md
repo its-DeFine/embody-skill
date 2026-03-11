@@ -5,14 +5,22 @@ description: Bootstrap a live Embody avatar session, fetch the current hosted co
 
 # Embody Skill
 
-This skill is a bootstrap, not the full protocol.
+This skill gives an agent a live embodied avatar.
 
 Use it to:
-- fetch the current public contract
-- start a guest session
-- attach to the returned Pixel Streaming URL
-- send real-time avatar commands over the live WebRTC DataChannel
+- start a guest avatar session with no code or login
+- connect to the live avatar stream
+- control the avatar in real time over the WebRTC DataChannel
+- speak through Kokoro TTS
+- change camera, emotion, appearance, and visual style
 - end the session cleanly
+
+This file is a bootstrap and field guide.
+It should tell an agent:
+- what the product can do
+- how to get a session
+- how to send commands
+- where the full current command surface lives
 
 ## 1) Current Model
 
@@ -30,10 +38,6 @@ Current public base URL:
 Current hosted bootstrap contract:
 - `https://api.embody.zone/api/bootstrap/skillmd`
 
-Operator-only domain:
-- `https://ops.embody.zone`
-- do not use this from client/consumer flows
-
 ## 2) Hard Rules
 
 - Start from the hosted bootstrap contract, not from stale copied examples.
@@ -45,7 +49,106 @@ Operator-only domain:
 - Never print or store secrets or internal diagnostics.
 - Do not send commands directly to orchestrator or edge TCP ports.
 
-## 3) Deterministic Flow
+## 3) What An Agent Can Do
+
+The stable avatar command strings are the same ones used in the older TCP flow.
+What changed is the preferred transport:
+
+- old preferred transport: server-side TCP relay
+- current preferred transport: Pixel Streaming DataChannel
+
+So the agent should think:
+- same command language
+- better real-time transport
+
+Main capability groups:
+
+### Camera And Framing
+
+Use this to control how the avatar is framed on screen.
+
+Examples:
+- `CAMSHOT.Medium`
+- `CAMSHOT.ExtremeClose`
+- `CAMSHOT.WideShot`
+- `CAMSHOT.HighAngle`
+- `CAMSHOT.LowAngle`
+
+### Speech And Voice
+
+Use this to make the avatar speak.
+
+Current proven path:
+- Kokoro TTS commands over DataChannel
+
+Example:
+- `TTS_Kokoro_Bella_Happy_0.7_Hello from Kokoro`
+
+### Emotion And Performance
+
+Use this to make the avatar react and perform.
+
+Examples:
+- `EMOTE_Wave`
+- `EMOTE_Angry`
+- `EMOTE_Confused`
+- `CONVO_Speaking`
+- `CONVO_SadTalk`
+
+### Appearance And Customization
+
+Use this to change the avatar body, clothes, hair, makeup, and styling.
+
+Examples:
+- `PRS.Fem`
+- `OF_NoHead_LucyBlackDress_LucyShorts1_LucyBoots1_NoBack`
+- `HS.Crop`
+- `HCR.2.5`
+- `MKUPF_Lipstick_1.0`
+
+### Visual Style And Post Processing
+
+Use this to change the mood and rendering feel.
+
+Examples:
+- `BloomInt_0.2`
+- `EXPOComp_1.0`
+- `CHROME_Int_0.1`
+- `VIG_0.2`
+- `GRAIN_GrainInten_0.0`
+
+### Environment And Worldbuilding
+
+Use this to place the avatar in a different scene or surround it with props and lights.
+
+Examples:
+- `LIGHT_Key_0_0_200`
+- `SPWN_Table01_...`
+
+The command surface is broad enough to support use cases like:
+- real-time assistant
+- news presenter
+- meeting participant
+- character performer
+- product guide
+
+## 4) Where To Find Commands
+
+Start with the human-readable stable reference in this repo:
+- `TCP_CONTROLLER_STABLE_REFERENCE.md`
+
+That file groups commands by category:
+- load/save
+- appearance
+- camera
+- animation
+- emotes
+- post-processing
+- lighting and assets
+
+Use that file as the current command catalog until a hosted command manifest is published.
+
+## 5) Deterministic Flow
 
 ### Step A: Fetch the current contract
 
@@ -150,7 +253,7 @@ Body:
 { "session_id": "<SESSION_ID>" }
 ```
 
-## 4) Minimal Proof Commands
+## 6) Minimal Proof Commands
 
 Use these first:
 - `CAMSHOT.Medium`
@@ -163,7 +266,30 @@ Then validate Kokoro:
 Operational rule:
 - for Kokoro, send one line at a time unless you have timing-aware queueing
 
-## 5) Command Contract
+## 7) Minimal Client Shape
+
+The intended shape is not “manually implement raw WebRTC.”
+
+The intended shape is a small session client that does:
+
+```ts
+await client.connect(webrtcUrl)
+await client.sendCommand("CAMSHOT.ExtremeClose")
+await client.sendCommand("TTS_Kokoro_Bella_Happy_0.7_Hello from Kokoro")
+await client.disconnect()
+```
+
+Internally:
+- connect to the Pixel Streaming session
+- wait for the DataChannel to be ready
+- use `emitCommand({ command: ... })`
+
+This makes the product usable from:
+- a browser
+- an embedded iframe client
+- an agent runtime with a browser/WebRTC shell
+
+## 8) Command Contract
 
 Stable command families remain documented in:
 - `TCP_CONTROLLER_STABLE_REFERENCE.md`
@@ -172,7 +298,7 @@ Important distinction:
 - the command *strings* are still the same stable avatar commands
 - the preferred transport is now DataChannel, not the public TCP relay API
 
-## 6) HTTP Templates
+## 9) HTTP Templates
 
 ### Bootstrap
 
@@ -231,7 +357,7 @@ curl -s -X POST "https://api.embody.zone/api/sessions/end" \
   - `/api/sessions/tcp` may still exist as fallback/admin
   - but it is not the preferred embodiment path
 
-## 8) Product Direction
+## 10) Product Direction
 
 This skill intentionally stays short and stable.
 
