@@ -141,8 +141,15 @@ Examples:
 Use this to place the avatar in a different scene or surround it with props and lights.
 
 Examples:
+- `SPWND`
 - `LIGHT_Key_0_0_200`
 - `SPWN_Table01_...`
+
+Important reset command:
+- `SPWND`
+  - clears all spawned objects
+  - use this when the environment becomes cluttered, broken, or visually deformed
+  - use this before loading a new spawned environment pack
 
 The command surface is broad enough to support use cases like:
 - real-time assistant
@@ -278,6 +285,7 @@ Use these first:
 - `CAMSHOT.Medium`
 - `CAMSHOT.ExtremeClose`
 - `EMOTE_Wave`
+- `SPWND`
 
 Then validate Kokoro:
 - `TTS_Kokoro_Bella_Happy_0.7_Hello from Kokoro`
@@ -373,6 +381,9 @@ curl -s -X POST "https://api.embody.zone/api/sessions/end" \
   - do not assume `emitConsoleCommand(...)` is valid
 - If camera works but Kokoro does not:
   - treat it as TTS/runtime behavior, not transport failure
+- If the avatar state or spawned world becomes messy, cluttered, or visually broken:
+  - send `SPWND`
+  - treat it as the first reset step for spawned environment state
 - If you have no browser/DataChannel client available:
   - `/api/sessions/tcp` may still exist as fallback/admin
   - but it is not the preferred embodiment path
