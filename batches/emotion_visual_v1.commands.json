@@ -1,0 +1,7 @@
+[
+  "EMOTION_Happy_0.8_0.77_BlendByWeight",
+  "EMOTION_Sad_0.5_0.6_Override",
+  "EMOTION_Neutral_0.66_0.77_BlendByWeight",
+  "EMOTION_Angry_1.0_0.9_Override",
+  "EMOTION_Love_0.7_0.8_BlendByWeight"
+]
