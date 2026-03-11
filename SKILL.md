@@ -22,7 +22,25 @@ It should tell an agent:
 - how to send commands
 - where the full current command surface lives
 
-## 1) Current Model
+## 1) Check For Updates First
+
+Before using this skill, and especially before debugging failures, check for updates.
+
+Minimum rule:
+- fetch the current hosted bootstrap contract:
+  - `https://api.embody.zone/api/bootstrap/skillmd`
+
+If behavior looks wrong, stale, or broken:
+- re-read this `SKILL.md`
+- re-fetch the hosted bootstrap contract
+- re-check the command reference in:
+  - `TCP_CONTROLLER_STABLE_REFERENCE.md`
+
+Operational assumption:
+- the hosted bootstrap contract is the current source of truth
+- this skill file should also be re-checked before assuming the product behavior has not changed
+
+## 2) Current Model
 
 Current alpha access model:
 - no invite code
@@ -38,9 +56,10 @@ Current public base URL:
 Current hosted bootstrap contract:
 - `https://api.embody.zone/api/bootstrap/skillmd`
 
-## 2) Hard Rules
+## 3) Hard Rules
 
 - Start from the hosted bootstrap contract, not from stale copied examples.
+- If anything behaves unexpectedly, re-check both this `SKILL.md` and the hosted bootstrap contract before debugging deeper.
 - Treat the returned `webrtc_url` as the session entrypoint.
 - Real-time control should use the Pixel Streaming DataChannel.
 - Primary command transport is `emitCommand({ command: "..." })`.
@@ -49,7 +68,7 @@ Current hosted bootstrap contract:
 - Never print or store secrets or internal diagnostics.
 - Do not send commands directly to orchestrator or edge TCP ports.
 
-## 3) What An Agent Can Do
+## 4) What An Agent Can Do
 
 The stable avatar command strings are the same ones used in the older TCP flow.
 What changed is the preferred transport:
@@ -132,7 +151,7 @@ The command surface is broad enough to support use cases like:
 - character performer
 - product guide
 
-## 4) Where To Find Commands
+## 5) Where To Find Commands
 
 Start with the human-readable stable reference in this repo:
 - `TCP_CONTROLLER_STABLE_REFERENCE.md`
@@ -148,7 +167,7 @@ That file groups commands by category:
 
 Use that file as the current command catalog until a hosted command manifest is published.
 
-## 5) Deterministic Flow
+## 6) Deterministic Flow
 
 ### Step A: Fetch the current contract
 
@@ -253,7 +272,7 @@ Body:
 { "session_id": "<SESSION_ID>" }
 ```
 
-## 6) Minimal Proof Commands
+## 7) Minimal Proof Commands
 
 Use these first:
 - `CAMSHOT.Medium`
@@ -266,7 +285,7 @@ Then validate Kokoro:
 Operational rule:
 - for Kokoro, send one line at a time unless you have timing-aware queueing
 
-## 7) Minimal Client Shape
+## 8) Minimal Client Shape
 
 The intended shape is not “manually implement raw WebRTC.”
 
@@ -289,7 +308,7 @@ This makes the product usable from:
 - an embedded iframe client
 - an agent runtime with a browser/WebRTC shell
 
-## 8) Command Contract
+## 9) Command Contract
 
 Stable command families remain documented in:
 - `TCP_CONTROLLER_STABLE_REFERENCE.md`
@@ -298,7 +317,7 @@ Important distinction:
 - the command *strings* are still the same stable avatar commands
 - the preferred transport is now DataChannel, not the public TCP relay API
 
-## 9) HTTP Templates
+## 10) HTTP Templates
 
 ### Bootstrap
 
@@ -343,9 +362,10 @@ curl -s -X POST "https://api.embody.zone/api/sessions/end" \
   -d "{\"session_id\":\"${SESSION_ID}\"}"
 ```
 
-## 7) Failure Handling
+## 11) Failure Handling
 
 - If bootstrap fetch fails: treat it as control-plane outage.
+- If behavior diverges from expectation: first re-check this `SKILL.md` and re-fetch the bootstrap contract before assuming a deeper platform bug.
 - If `start` fails with capacity exhaustion: wait and retry; do not spin.
 - If browser attach fails: treat it as edge/session problem, not command-format problem.
 - If DataChannel commands appear ignored:
@@ -357,7 +377,7 @@ curl -s -X POST "https://api.embody.zone/api/sessions/end" \
   - `/api/sessions/tcp` may still exist as fallback/admin
   - but it is not the preferred embodiment path
 
-## 10) Product Direction
+## 12) Product Direction
 
 This skill intentionally stays short and stable.
 
