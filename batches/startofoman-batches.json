@@ -1,0 +1,103 @@
+[
+  {
+    "batch_id": "camera_visual_v1",
+    "description": "Visually verifiable camera-angle and camera-stream commands over DataChannel.",
+    "include_source": [
+      "Camera-Controller/Angles/Commands/Angles-Commands.json",
+      "Camera-Controller/Full-Camera-Control/Commands/Full-Camera-Control-Commands.json"
+    ],
+    "observability": "visual",
+    "notes": [
+      "Use screenshots plus proof.webm as primary evidence.",
+      "Run first; this is the fastest confidence check for session attach plus command transport."
+    ]
+  },
+  {
+    "batch_id": "emotion_visual_v1",
+    "description": "Emotion blend/override commands with visible face-state changes.",
+    "include_source": [
+      "Emotion/Commands/Emotion-Commands.json"
+    ],
+    "observability": "visual_manual_review",
+    "notes": [
+      "Requires human or frame-level semantic review because the change may be subtle.",
+      "Use a stable medium or close camera before batch start."
+    ]
+  },
+  {
+    "batch_id": "customization_visual_v1",
+    "description": "Preset-level customization commands expected to cause visible avatar changes.",
+    "include_source": [
+      "Customization/Clothing/Commands/Clothing-Commands.json",
+      "Customization/Hair/Commands/Hair-Commands.json",
+      "Customization/MetaHuman Presets/Commands/MetaHuman-Presets-Commands.json"
+    ],
+    "observability": "visual",
+    "notes": [
+      "Prefer low-count subsets first because some commands may stack or persist between runs.",
+      "Reset or re-open a fresh session between sub-batches if visual state drift becomes confusing."
+    ]
+  },
+  {
+    "batch_id": "postfx_visual_v1",
+    "description": "Post-processing commands expected to change exposure, grain, vignette, and lens characteristics.",
+    "include_source": [
+      "Post-Processing/Effects/Bloom/Commands/Bloom-Commands.json",
+      "Post-Processing/Effects/Chromatic-Aberration/Commands/Chromatic-Aberration-Commands.json",
+      "Post-Processing/Effects/Color-Grading/Commands/Color-Grading-Commands.json",
+      "Post-Processing/Effects/Color-Temperature-Tint/Commands/Color-Temperature-Tint-Commands.json",
+      "Post-Processing/Effects/Exposure/Commands/Exposure-Commands.json",
+      "Post-Processing/Effects/Film-Tone-Curve/Commands/Film-Tone-Curve-Commands.json",
+      "Post-Processing/Effects/Grain/Commands/Grain-Commands.json",
+      "Post-Processing/Effects/Lens-Exposure/Commands/Lens-Exposure-Commands.json",
+      "Post-Processing/Effects/Lens-Flare/Commands/Lens-Flare-Commands.json",
+      "Post-Processing/Effects/Misc/Commands/Misc-Commands.json",
+      "Post-Processing/Effects/Vignette-Sharpen/Commands/Vignette-Sharpen-Commands.json"
+    ],
+    "observability": "visual_manual_review",
+    "notes": [
+      "Frame diffs matter more than obvious gross motion here.",
+      "Batch should be split further if changes become too hard to attribute command-by-command."
+    ]
+  },
+  {
+    "batch_id": "scene_lighting_visual_v1",
+    "description": "Lighting and build-your-own scene commands with visible world-state changes.",
+    "include_source": [
+      "Scenes/Build-Your-Own/Commands/Build-Your-Own-Commands.json",
+      "Scenes/Lighting/Commands/Lighting-Commands.json"
+    ],
+    "observability": "visual_manual_review",
+    "notes": [
+      "Some commands are templates and require parameterized expansion before execution.",
+      "Start with non-destructive or reset-friendly scene commands."
+    ]
+  },
+  {
+    "batch_id": "tts_custom_contract_v1",
+    "description": "BYOB and TTS timing contract commands.",
+    "include_source": [
+      "TTS/Custom-TTS/Commands/Custom-TTS-Commands.json",
+      "TTS/Speech-Tracking/Timing/Commands/Timing-Commands.json",
+      "TTS/Speech-Tracking/Narration/Commands/Narration-Commands.json",
+      "TTS/Speech-Tracking/Subtitles/Commands/Subtitles-Commands.json"
+    ],
+    "observability": "log_plus_audio",
+    "notes": [
+      "Requires game diagnostics and/or audible proof, not just screenshots.",
+      "Timing commands should be validated as control-state expectations, not avatar-content changes."
+    ]
+  },
+  {
+    "batch_id": "tts_elevenlabs_contract_v1",
+    "description": "ElevenLabs public command contract, likely requiring credentials or mock/no-op handling.",
+    "include_source": [
+      "TTS/ElevenLabs/Commands/ElevenLabs-Commands.json"
+    ],
+    "observability": "log_plus_audio",
+    "notes": [
+      "Do not assume credentials are available.",
+      "Treat this as contract validation first, not guaranteed successful synthesis."
+    ]
+  }
+]
