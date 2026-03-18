@@ -62,7 +62,7 @@ Current hosted bootstrap contract:
 - If anything behaves unexpectedly, re-check both this `SKILL.md` and the hosted bootstrap contract before debugging deeper.
 - Treat the returned `webrtc_url` as the session entrypoint.
 - Real-time control should use the Pixel Streaming DataChannel.
-- Primary command transport is `emitCommand({ command: "..." })`.
+- Primary command transport is `client.sendCommand("...")`  via the EmbodyDataChannelClient wrapper.
 - Do not use `/api/sessions/tcp` as the normal embodiment path.
 - Keep `/api/sessions/tcp` only as fallback/admin/debug.
 - Never print or store secrets or internal diagnostics.
@@ -209,18 +209,23 @@ Do not rotate this every call. Reuse it so the control plane can enforce sane gu
 
 `POST https://api.embody.zone/api/sessions/start`
 
-Recommended body:
+Required body:
 
 ```json
 {
-  "requested_duration_seconds": 600,
   "installation_id": "<INSTALLATION_ID>",
-  "installation_public_fingerprint": "<SHA256_FINGERPRINT>",
-  "client_name": "your-client-name",
-  "client_version": "0.1.0",
-  "bootstrap_manifest_version": "v1"
+  "token": "<OTP_TOKEN>",
+  "requested_duration_seconds": 600
 }
 ```
+
+The `token` is an OTP token in format `hmac_hex.expires_at_unix`. Obtain one via the token minting API (requires admin authorization). Expired or invalid tokens are rejected.
+
+Token lifecycle:
+- Tokens are bound to `installation_id` — a token minted for one identity cannot be used with another
+- Same token + same `installation_id` returns the existing active session (session resume)
+- Session lease (`expires_at`) is independent of token expiry
+- Tokens are not consumed on use — they remain valid until their expiry timestamp
 
 Important response fields:
 - `session_id`
@@ -248,26 +253,22 @@ Do not rewrite:
 
 ### Step E: Send commands over DataChannel
 
-Primary real-time command path:
+Use the EmbodyDataChannelClient wrapper (from `browser/embody_datachannel_client.js`):
 
 ```js
-window.pixelStreaming.emitCommand({ command: "CAMSHOT.ExtremeClose" })
-window.pixelStreaming.emitCommand({ command: "TTS_Kokoro_Bella_Happy_0.7_Hello from Kokoro" })
+const client = await EmbodyDataChannelClient.waitForPixelStreaming();
+await client.waitForPlayableVideo();
+client.sendCommand("CAMSHOT.ExtremeClose");
+client.sendCommand("TTS_Kokoro_Bella_Happy_0.7_Hello from Kokoro");
 ```
 
-If you are building a wrapper client, the wrapper should expose something like:
+The wrapper API:
+- `sendCommand(commandString)` — send a single command
+- `sendCommands(commandArray, { delayMs })` — send multiple commands with optional delay
+- `addResponseListener(callback)` — listen for avatar responses
+- `getState()` — get current connection state
 
-```ts
-await client.connect(webrtcUrl)
-await client.sendCommand("CAMSHOT.ExtremeClose")
-await client.sendCommand("TTS_Kokoro_Bella_Happy_0.7_Hello from Kokoro")
-await client.disconnect()
-```
-
-But internally it should still use:
-- Pixel Streaming client
-- WebRTC DataChannel
-- `emitCommand({ command: ... })`
+Internally the wrapper calls `pixelStreaming.emitCommand({ command })` over the WebRTC DataChannel. Agents should use `sendCommand()`, not `emitCommand()` directly.
 
 ### Step F: End cleanly
 
@@ -309,7 +310,7 @@ await client.disconnect()
 Internally:
 - connect to the Pixel Streaming session
 - wait for the DataChannel to be ready
-- use `emitCommand({ command: ... })`
+- use `sendCommand(commandString)` (wraps `emitCommand` internally)
 
 This makes the product usable from:
 - a browser
@@ -337,28 +338,15 @@ curl -s https://api.embody.zone/api/bootstrap/skillmd
 
 ```bash
 BASE="https://api.embody.zone"
-INSTALLATION_ID="$(python3 - <<'PY'
-import uuid
-print(uuid.uuid4().hex)
-PY
-)"
-export INSTALLATION_ID
-FINGERPRINT="$(python3 - <<'PY'
-import hashlib, os
-installation_id = os.environ["INSTALLATION_ID"]
-print(hashlib.sha256(installation_id.encode("utf-8")).hexdigest())
-PY
-)"
+INSTALLATION_ID="$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
+TOKEN="<OTP_TOKEN>"  # from /api/tokens/mint
 
 curl -s -X POST "${BASE}/api/sessions/start" \
   -H "Content-Type: application/json" \
   -d "{
-    \"requested_duration_seconds\": 600,
     \"installation_id\": \"${INSTALLATION_ID}\",
-    \"installation_public_fingerprint\": \"${FINGERPRINT}\",
-    \"client_name\": \"skillmd-client\",
-    \"client_version\": \"0.1.0\",
-    \"bootstrap_manifest_version\": \"v1\"
+    \"token\": \"${TOKEN}\",
+    \"requested_duration_seconds\": 600
   }"
 ```
 
@@ -377,8 +365,8 @@ curl -s -X POST "https://api.embody.zone/api/sessions/end" \
 - If `start` fails with capacity exhaustion: wait and retry; do not spin.
 - If browser attach fails: treat it as edge/session problem, not command-format problem.
 - If DataChannel commands appear ignored:
-  - first verify you used `emitCommand({ command: ... })`
-  - do not assume `emitConsoleCommand(...)` is valid
+  - first verify you used `client.sendCommand("...")` via the wrapper
+  - do not call `emitCommand` or `emitConsoleCommand` directly
 - If camera works but Kokoro does not:
   - treat it as TTS/runtime behavior, not transport failure
 - If the avatar state or spawned world becomes messy, cluttered, or visually broken:
