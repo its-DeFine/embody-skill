@@ -27,9 +27,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default="https://api.embody.zone")
     parser.add_argument("--origin", default="http://app.embody.zone")
     parser.add_argument("--bootstrap-manifest-url", default=None)
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--invite-code")
-    mode.add_argument("--installation-id-file")
+    parser.add_argument("--token", required=True, help="OTP token (hmac_hex.expires_at_unix) from /api/tokens/mint")
+    parser.add_argument("--installation-id-file", required=True)
     parser.add_argument("--artifact-dir", required=True)
     parser.add_argument("--client-js", required=True)
     parser.add_argument("--command", action="append", required=True, help="Command to send via DataChannel. Repeat for multiple commands.")
@@ -58,19 +57,14 @@ def start_session(
     *,
     base_url: str,
     requested_duration_seconds: int,
-    invite_code: str | None = None,
-    installation_identity: dict | None = None,
-    bootstrap_manifest_version: str | None = None,
+    token: str,
+    installation_identity: dict,
 ) -> dict:
     payload = {
+        "installation_id": installation_identity["installation_id"],
+        "token": token,
         "requested_duration_seconds": requested_duration_seconds,
     }
-    if invite_code:
-        payload["invite_code"] = invite_code
-    if installation_identity:
-        payload.update(installation_identity)
-    if bootstrap_manifest_version:
-        payload["bootstrap_manifest_version"] = bootstrap_manifest_version
     response = session.post(
         f"{base_url}/api/sessions/start",
         json=payload,
@@ -100,7 +94,6 @@ def main() -> None:
     base_url = args.base_url.rstrip("/")
     origin = args.origin
     manifest = {
-        "invite_code": args.invite_code,
         "installation_id_file": args.installation_id_file,
         "base_url": base_url,
         "origin": origin,
@@ -118,24 +111,15 @@ def main() -> None:
         manifest["bootstrap_manifest"] = bootstrap_manifest
     session.headers.update(browser_headers(origin))
 
-    installation_identity = None
-    bootstrap_manifest_version = None
-    if args.installation_id_file:
-        installation_identity = load_or_create_installation_identity(Path(args.installation_id_file))
-        manifest["installation_identity"] = installation_identity
-        bootstrap_manifest_version = (
-            str(bootstrap_manifest.get("version") or "")
-            if isinstance(bootstrap_manifest, dict)
-            else None
-        ) or None
+    installation_identity = load_or_create_installation_identity(Path(args.installation_id_file))
+    manifest["installation_identity"] = installation_identity
 
     start = start_session(
         session,
         base_url=base_url,
         requested_duration_seconds=args.requested_duration_seconds,
-        invite_code=args.invite_code,
+        token=args.token,
         installation_identity=installation_identity,
-        bootstrap_manifest_version=bootstrap_manifest_version,
     )
     manifest["start"] = start
     session_id = start["session_id"]
