@@ -188,8 +188,8 @@ Read at minimum:
 - `limits.max_concurrent_sessions`
 
 Expected alpha transport:
-- `transport.primary = pixelstreaming_datachannel_emitcommand`
-- `webrtc.command_method = emitCommand`
+- `transport.primary = pixelstreaming_datachannel_sendcommand`
+- `webrtc.command_method = sendCommand`
 
 ### Step B: Create or load installation identity
 
@@ -240,7 +240,7 @@ Important response fields:
 Expected alpha response:
 - `mode = guest`
 - `command_mode = datachannel`
-- `command_method = emitCommand`
+- `command_method = sendCommand`
 
 ### Step D: Attach to the live session
 
