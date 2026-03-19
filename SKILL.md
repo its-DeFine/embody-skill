@@ -43,6 +43,7 @@ Operational assumption:
 ## 2) Current Model
 
 Current alpha access model:
+- API key required for session creation (provisioned by admin, not self-service)
 - no invite code
 - no login
 - guest session on first use
@@ -65,7 +66,7 @@ Current hosted bootstrap contract:
 - Primary command transport is `client.sendCommand("...")`  via the EmbodyDataChannelClient wrapper.
 - Do not use `/api/sessions/tcp` as the normal embodiment path.
 - Keep `/api/sessions/tcp` only as fallback/admin/debug.
-- Never print or store secrets or internal diagnostics.
+- Never print or store secrets, API keys, or internal diagnostics.
 - Do not send commands directly to orchestrator or edge TCP ports.
 
 ## 4) What An Agent Can Do
@@ -209,6 +210,11 @@ Do not rotate this every call. Reuse it so the control plane can enforce sane gu
 
 `POST https://api.embody.zone/api/sessions/start`
 
+Required header:
+- `Authorization: Bearer <YOUR_API_KEY>`
+
+API keys are provisioned by the admin. There is no self-service key creation. Without a valid API key, the endpoint returns `401 Unauthorized`.
+
 Required body:
 
 ```json
@@ -226,6 +232,10 @@ Token lifecycle:
 - Same token + same `installation_id` returns the existing active session (session resume)
 - Session lease (`expires_at`) is independent of token expiry
 - Tokens are not consumed on use — they remain valid until their expiry timestamp
+
+Error responses:
+- `401 Unauthorized` — missing or invalid API key
+- `503 Service Unavailable` — `{"error": "no_capacity", "message": "No sessions available"}` when all nodes are occupied
 
 Important response fields:
 - `session_id`
@@ -273,6 +283,8 @@ Internally the wrapper calls `pixelStreaming.emitCommand({ command })` over the 
 ### Step F: End cleanly
 
 `POST https://api.embody.zone/api/sessions/end`
+
+No API key required for ending a session.
 
 Body:
 
@@ -338,11 +350,13 @@ curl -s https://api.embody.zone/api/bootstrap/skillmd
 
 ```bash
 BASE="https://api.embody.zone"
+API_KEY="<YOUR_API_KEY>"  # provisioned by admin
 INSTALLATION_ID="$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
 TOKEN="<OTP_TOKEN>"  # from /api/tokens/mint
 
 curl -s -X POST "${BASE}/api/sessions/start" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${API_KEY}" \
   -d "{
     \"installation_id\": \"${INSTALLATION_ID}\",
     \"token\": \"${TOKEN}\",
@@ -362,7 +376,8 @@ curl -s -X POST "https://api.embody.zone/api/sessions/end" \
 
 - If bootstrap fetch fails: treat it as control-plane outage.
 - If behavior diverges from expectation: first re-check this `SKILL.md` and re-fetch the bootstrap contract before assuming a deeper platform bug.
-- If `start` fails with capacity exhaustion: wait and retry; do not spin.
+- If `start` returns 401: the API key is missing, invalid, or expired. Contact the admin for a valid key.
+- If `start` returns 503 with `no_capacity`: all orchestrator nodes are occupied. Wait and retry; do not spin.
 - If browser attach fails: treat it as edge/session problem, not command-format problem.
 - If DataChannel commands appear ignored:
   - first verify you used `client.sendCommand("...")` via the wrapper
