@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON files
+        run: |
+          find batches -type f -name '*.json' -print0 | while IFS= read -r -d '' file; do
+            python3 -m json.tool "$file" > /dev/null
+          done
+
+      - name: Check JavaScript syntax
+        run: node --check browser/embody_datachannel_client.js
+
+      - name: Compile Python files
+        run: python3 -m compileall tools
