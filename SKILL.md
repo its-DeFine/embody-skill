@@ -229,7 +229,7 @@ The `token` is an OTP token in format `hmac_hex.expires_at_unix`. Obtain one via
 
 Token lifecycle:
 - Tokens are bound to `installation_id` — a token minted for one identity cannot be used with another
-- Same token + same `installation_id` returns the existing active session (session resume)
+- Same token + same `installation_id` returns the same active `session_id` (session resume), not an error
 - Session lease (`expires_at`) is independent of token expiry
 - Tokens are not consumed on use — they remain valid until their expiry timestamp
 
