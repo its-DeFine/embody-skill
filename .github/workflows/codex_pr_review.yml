@@ -1,0 +1,62 @@
+name: "Codex: PR Review"
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  codex_review:
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    env:
+      CODEX_MODEL: gpt-5.1
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Pre-fetch base and head refs
+        run: |
+          git fetch --no-tags origin \
+            ${{ github.event.pull_request.base.ref }} \
+            +refs/pull/${{ github.event.pull_request.number }}/head
+
+      - name: Check required secrets
+        id: secrets
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "${OPENAI_API_KEY}" ]]; then
+            echo "can_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "can_run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run Codex
+        if: ${{ steps.secrets.outputs.can_run == 'true' }}
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/pr_review.md
+          sandbox: read-only
+          codex-args: --model ${{ env.CODEX_MODEL }}
+
+      - name: Post Codex review comment
+        if: ${{ steps.secrets.outputs.can_run == 'true' && steps.run_codex.outputs['final-message'] != '' }}
+        uses: actions/github-script@v7
+        env:
+          CODEX_FINAL_MESSAGE: ${{ steps.run_codex.outputs['final-message'] }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: process.env.CODEX_FINAL_MESSAGE,
+            });
