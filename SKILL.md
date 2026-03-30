@@ -69,6 +69,11 @@ Current hosted bootstrap contract:
 - Never print or store secrets, API keys, or internal diagnostics.
 - Do not send commands directly to orchestrator or edge TCP ports.
 
+### Operator Review Note
+
+- For engineering-lane proof or review-visibility updates in this repo, keep the repo change docs-only or comment-only.
+- Keep the evidence reviewable by linking worktree verification notes or local-safe logs instead of changing runtime behavior.
+
 ## 4) What An Agent Can Do
 
 The stable avatar command strings are the same ones used in the older TCP flow.
